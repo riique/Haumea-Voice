@@ -29,7 +29,7 @@ Use estas dicas de vocabulario para corrigir termos que podem soar parecidos:
 
 Mantenha nomes proprios, nomes de produtos, termos tecnicos e siglas com a grafia indicada pelo usuario.`
 
-export const DEFAULT_GROQ_TRANSCRIPTION_PROMPT = `Transcreva o audio no idioma original falado.
+const LEGACY_GROQ_CONTEXT_TRANSCRIPTION_PROMPT = `Transcreva o audio no idioma original falado.
 
 Contexto anterior da conversa:
 Os nomes corretos usados nesta conversa sao Haumea e Groq.
@@ -37,6 +37,14 @@ Os nomes corretos usados nesta conversa sao Haumea e Groq.
 Glossario de grafia:
 - Haumeia, Halmeia, Raumea -> Haumea
 - Grock, Grocke, GROCKE, Grok, Groc, Groque, Groke -> Groq`
+
+export const DEFAULT_GROQ_TRANSCRIPTION_PROMPT = `Transcreva o audio no idioma original falado.
+
+Contexto anterior da conversa:
+O nome correto usado nesta conversa e Haumea.
+
+Glossario de grafia:
+- Haumeia, Halmeia, Raumea -> Haumea`
 
 export const DEFAULT_GROQ_SETTINGS: GroqSettings = {
     transcriptionPrompt: DEFAULT_GROQ_TRANSCRIPTION_PROMPT,
@@ -58,7 +66,8 @@ export function normalizeGroqSettings(
     const normalizedTranscriptionPrompt =
         !transcriptionPrompt ||
             transcriptionPrompt === LEGACY_GROQ_TRANSCRIPTION_PROMPT ||
-            transcriptionPrompt === LEGACY_GROQ_TRANSCRIPTION_PROMPT_WITH_GROQ
+            transcriptionPrompt === LEGACY_GROQ_TRANSCRIPTION_PROMPT_WITH_GROQ ||
+            transcriptionPrompt === LEGACY_GROQ_CONTEXT_TRANSCRIPTION_PROMPT
             ? DEFAULT_GROQ_TRANSCRIPTION_PROMPT
             : transcriptionPrompt
 
