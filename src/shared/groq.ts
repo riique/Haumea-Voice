@@ -21,23 +21,6 @@ Use estas dicas de vocabulario para corrigir termos que podem soar parecidos:
 
 Mantenha nomes proprios, nomes de produtos, termos tecnicos e siglas com a grafia indicada pelo usuario.`
 
-const LEGACY_GROQ_TRANSCRIPTION_PROMPT_WITH_GROQ = `Transcreva o audio no idioma original falado.
-
-Use estas dicas de vocabulario para corrigir termos que podem soar parecidos:
-- Se ouvir algo como "Haumeia", "Halmeia" ou "Raumea", escreva sempre "Haumea".
-- Se ouvir algo como "Grock", "Grocke", "GROCKE", "Grok" ou "Groc", escreva sempre "Groq".
-
-Mantenha nomes proprios, nomes de produtos, termos tecnicos e siglas com a grafia indicada pelo usuario.`
-
-const LEGACY_GROQ_CONTEXT_TRANSCRIPTION_PROMPT = `Transcreva o audio no idioma original falado.
-
-Contexto anterior da conversa:
-Os nomes corretos usados nesta conversa sao Haumea e Groq.
-
-Glossario de grafia:
-- Haumeia, Halmeia, Raumea -> Haumea
-- Grock, Grocke, GROCKE, Grok, Groc, Groque, Groke -> Groq`
-
 export const DEFAULT_GROQ_TRANSCRIPTION_PROMPT = `Transcreva o audio no idioma original falado.
 
 Contexto anterior da conversa:
@@ -58,18 +41,34 @@ export function cloneGroqSettings(settings: GroqSettings): GroqSettings {
     }
 }
 
+function stripGroqContext(prompt: string): string {
+    return prompt
+        .split('\n')
+        .map(line =>
+            line.toLowerCase().includes('haumea e groq')
+                ? 'O nome correto usado nesta conversa e Haumea.'
+                : line
+        )
+        .filter(line => {
+            const normalized = line.toLowerCase()
+            return !normalized.includes('-> groq') &&
+                !normalized.includes('escreva sempre "groq"')
+        })
+        .join('\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim()
+}
+
 export function normalizeGroqSettings(
     settings?: Partial<GroqSettings> | null
 ): GroqSettings {
     const seen = new Set<string>()
     const transcriptionPrompt = settings?.transcriptionPrompt?.trim()
-    const normalizedTranscriptionPrompt =
-        !transcriptionPrompt ||
-            transcriptionPrompt === LEGACY_GROQ_TRANSCRIPTION_PROMPT ||
-            transcriptionPrompt === LEGACY_GROQ_TRANSCRIPTION_PROMPT_WITH_GROQ ||
-            transcriptionPrompt === LEGACY_GROQ_CONTEXT_TRANSCRIPTION_PROMPT
+    const baseTranscriptionPrompt =
+        !transcriptionPrompt || transcriptionPrompt === LEGACY_GROQ_TRANSCRIPTION_PROMPT
             ? DEFAULT_GROQ_TRANSCRIPTION_PROMPT
             : transcriptionPrompt
+    const normalizedTranscriptionPrompt = stripGroqContext(baseTranscriptionPrompt)
 
     const cleaned = (settings?.modelPriority ?? [])
         .map(m => m.trim())
