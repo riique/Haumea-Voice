@@ -82,11 +82,13 @@ function saveStoredGeminiSettings(settings: Partial<GeminiSettings>): GeminiSett
 }
 
 function getStoredGroqSettings(): GroqSettings {
-    return normalizeGroqSettings(
+    const normalized = normalizeGroqSettings(
         store.get('groqSettings', cloneGroqSettings(DEFAULT_GROQ_SETTINGS)) as
         | Partial<GroqSettings>
         | undefined
     )
+    store.set('groqSettings', cloneGroqSettings(normalized))
+    return normalized
 }
 
 function saveStoredGroqSettings(settings: Partial<GroqSettings>): GroqSettings {
