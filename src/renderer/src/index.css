@@ -1,0 +1,110 @@
+@import "tailwindcss";
+
+@theme {
+    --color-bg: #f1ebd9;
+    --color-sidebar: #eae4d1;
+    --color-surface: #ffffff;
+    --color-text-main: #121214;
+    --color-text-sec: #5c5c5e;
+    --color-accent: #de491b;
+    --color-border: #dfd9c8;
+    --color-success: #10B981;
+
+    --font-display: "Syne", system-ui, sans-serif;
+    --font-sans: "Manrope", system-ui, sans-serif;
+    --font-mono: "Space Mono", monospace;
+}
+
+@layer base {
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    body {
+        font-family: var(--font-sans);
+        background: var(--color-bg);
+        color: var(--color-text-main);
+        -webkit-font-smoothing: antialiased;
+        overflow: hidden;
+        user-select: none;
+    }
+
+    ::-webkit-scrollbar {
+        width: 5px;
+    }
+
+    ::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background: var(--color-border);
+        border-radius: 2px;
+    }
+}
+
+/* Markdown prose */
+.prose-custom h1,
+.prose-custom h2,
+.prose-custom h3 {
+    font-family: var(--font-display);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+}
+
+.prose-custom h1 {
+    font-size: 1.25rem;
+}
+
+.prose-custom h2 {
+    font-size: 1.1rem;
+}
+
+.prose-custom h3 {
+    font-size: 0.95rem;
+}
+
+.prose-custom p {
+    margin-bottom: 0.75em;
+    line-height: 1.7;
+}
+
+.prose-custom ul,
+.prose-custom ol {
+    padding-left: 1.25em;
+    margin-bottom: 0.75em;
+}
+
+.prose-custom li {
+    margin-bottom: 0.25em;
+    line-height: 1.6;
+}
+
+.prose-custom strong {
+    font-weight: 600;
+}
+
+.prose-custom code {
+    font-family: var(--font-mono);
+    font-size: 0.85em;
+    background: var(--color-sidebar);
+    padding: 0.15em 0.35em;
+}
+
+.prose-custom blockquote {
+    border-left: 3px solid var(--color-accent);
+    padding-left: 1em;
+    color: var(--color-text-sec);
+    margin: 1em 0;
+}
+
+/* Overlay window — transparent background */
+html.overlay-mode,
+html.overlay-mode body {
+    background: transparent !important;
+    overflow: hidden;
+}

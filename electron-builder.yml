@@ -1,0 +1,36 @@
+appId: com.haumea.voice
+productName: Haumea Voice
+directories:
+  buildResources: build
+files:
+  - '!**/.vscode/*'
+  - '!src/*'
+  - '!python/*'
+  - '!electron.vite.config.{js,ts,mjs,cjs}'
+  - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+  - '!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml}'
+extraResources:
+  - from: 'python'
+    to: 'python'
+    filter:
+      - '**/*.py'
+      - '**/requirements.txt'
+win:
+  executableName: haumea-voice
+nsis:
+  artifactName: ${name}-${version}-setup.${ext}
+  shortcutName: ${productName}
+  uninstallDisplayName: ${productName}
+  createDesktopShortcut: always
+mac:
+  entitlementsInherit: build/entitlements.mac.plist
+  extendInfo:
+    - NSMicrophoneUsageDescription: Application requests access to the device's microphone.
+  notarize: false
+linux:
+  target:
+    - AppImage
+    - deb
+  maintainer: haumea.voice
+  category: Utility
+npmRebuild: false
