@@ -14,20 +14,7 @@ const LEGACY_GROQ_MODEL_PRIORITY_WITH_DISTIL = [
     'distil-whisper-large-v3-en'
 ]
 
-const LEGACY_GROQ_TRANSCRIPTION_PROMPT = `Transcreva o audio no idioma original falado.
-
-Use estas dicas de vocabulario para corrigir termos que podem soar parecidos:
-- Se ouvir algo como "Haumeia", "Halmeia" ou "Raumea", escreva sempre "Haumea".
-
-Mantenha nomes proprios, nomes de produtos, termos tecnicos e siglas com a grafia indicada pelo usuario.`
-
-export const DEFAULT_GROQ_TRANSCRIPTION_PROMPT = `Transcreva o audio no idioma original falado.
-
-Contexto anterior da conversa:
-O nome correto usado nesta conversa e Haumea.
-
-Glossario de grafia:
-- Haumeia, Halmeia, Raumea -> Haumea`
+export const DEFAULT_GROQ_TRANSCRIPTION_PROMPT = ''
 
 export const DEFAULT_GROQ_SETTINGS: GroqSettings = {
     transcriptionPrompt: DEFAULT_GROQ_TRANSCRIPTION_PROMPT,
@@ -42,16 +29,22 @@ export function cloneGroqSettings(settings: GroqSettings): GroqSettings {
 }
 
 function stripGroqContext(prompt: string): string {
+    if (/\bhaume(?:a|ia)\b|\bhalmeia\b|\braumea\b/i.test(prompt)) {
+        return DEFAULT_GROQ_TRANSCRIPTION_PROMPT
+    }
+
     return prompt
         .split('\n')
-        .map(line =>
-            line.toLowerCase().includes('haumea e groq')
-                ? 'O nome correto usado nesta conversa e Haumea.'
-                : line
-        )
         .filter(line => {
             const normalized = line.toLowerCase()
-            return !normalized.includes('-> groq') &&
+            return !normalized.includes('haumea') &&
+                !normalized.includes('haumeia') &&
+                !normalized.includes('halmeia') &&
+                !normalized.includes('raumea') &&
+                !normalized.includes('contexto anterior') &&
+                !normalized.includes('glossario de grafia') &&
+                !normalized.includes('glossário de grafia') &&
+                !normalized.includes('-> groq') &&
                 !normalized.includes('escreva sempre "groq"')
         })
         .join('\n')
@@ -65,7 +58,7 @@ export function normalizeGroqSettings(
     const seen = new Set<string>()
     const transcriptionPrompt = settings?.transcriptionPrompt?.trim()
     const baseTranscriptionPrompt =
-        !transcriptionPrompt || transcriptionPrompt === LEGACY_GROQ_TRANSCRIPTION_PROMPT
+        !transcriptionPrompt
             ? DEFAULT_GROQ_TRANSCRIPTION_PROMPT
             : transcriptionPrompt
     const normalizedTranscriptionPrompt = stripGroqContext(baseTranscriptionPrompt)

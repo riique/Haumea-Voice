@@ -938,7 +938,7 @@ export default function SettingsPage() {
             <Card icon={<Cloud size={15} strokeWidth={1.8} className="text-accent" />} title="Groq — Prompt">
                 <div className="flex flex-col gap-1.5">
                     <span className="text-[13px] font-medium text-text-main">
-                        Prompt de transcrição
+                        Prompt de transcrição opcional
                     </span>
                     <textarea
                         value={groqTranscriptionPrompt}
@@ -946,19 +946,18 @@ export default function SettingsPage() {
                         className="w-full min-h-[170px] p-3 bg-bg border border-border text-[12px] leading-relaxed text-text-main font-mono focus:outline-none focus:border-accent transition-colors resize-y"
                     />
                     <span className="font-mono text-[10px] text-text-sec/60 leading-relaxed">
-                        Este texto é enviado no campo prompt de todas as próximas transcrições
-                        feitas pela Groq. Use-o para listar grafias corretas, nomes próprios,
-                        siglas e termos técnicos.
+                        As transcrições da Groq agora são enviadas sem contexto por padrão, para
+                        que cada áudio seja interpretado isoladamente.
                     </span>
                 </div>
 
                 <div className="mt-4 flex items-center justify-between gap-3">
                     <span className="font-mono text-[10px] text-text-sec/60 leading-relaxed">
-                        Ex.: se ouvir "Halmeia", escrever "Haumea".
+                        Deixe vazio para manter a transcrição sem viés de vocabulário.
                     </span>
                     <button
                         onClick={saveGroqPrompt}
-                        disabled={groqPromptSaving || !groqTranscriptionPrompt.trim() || !groqPromptDirty}
+                        disabled={groqPromptSaving || !groqPromptDirty}
                         className="h-10 px-5 bg-accent text-surface text-[13px] font-semibold hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0"
                     >
                         {groqPromptSaving ? <Loader2 size={14} className="animate-spin" /> : 'Salvar prompt'}

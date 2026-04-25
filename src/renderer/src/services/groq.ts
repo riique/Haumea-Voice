@@ -7,14 +7,11 @@
  */
 
 import { KeyPool, NoAvailableKeyError } from './key-pool'
-import { DEFAULT_GROQ_MODEL_PRIORITY, normalizeGroqSettings } from './groq-settings'
+import { DEFAULT_GROQ_MODEL_PRIORITY } from './groq-settings'
 
 const GROQ_TRANSCRIPTION_ENDPOINT = 'https://api.groq.com/openai/v1/audio/transcriptions'
-const GROQ_CHAT_ENDPOINT = 'https://api.groq.com/openai/v1/chat/completions'
-const GROQ_TRANSCRIPT_CORRECTION_MODEL = 'llama-3.1-8b-instant'
 const MAX_FILE_BYTES = 25 * 1024 * 1024
 const TRANSCRIPTION_TIMEOUT_MS = 60_000
-const CORRECTION_TIMEOUT_MS = 12_000
 const MAX_ATTEMPTS_PER_MODEL = 3
 const RETRY_DELAY_MS = 450
 const AUDIO_PROMPT_MAX_CHARS = 900
@@ -31,19 +28,6 @@ export interface TranscribeOptions {
 export interface GroqTranscriptionResult {
     text: string
     [key: string]: unknown
-}
-
-interface VocabularyRule {
-    variants: string[]
-    replacement: string
-}
-
-interface GroqChatCompletionResult {
-    choices?: Array<{
-        message?: {
-            content?: string
-        }
-    }>
 }
 
 const pool = new KeyPool({ provider: 'groq' })
@@ -157,158 +141,6 @@ function parseGroqTranscription(raw: string, model: string): GroqTranscriptionRe
     return data
 }
 
-function cleanTerm(term: string): string {
-    return term
-        .trim()
-        .replace(/^["'`]+/, '')
-        .replace(/["'`.,;:]+$/, '')
-        .trim()
-}
-
-function extractTerms(raw: string): string[] {
-    const quoted = [...raw.matchAll(/"([^"]+)"/g)]
-        .map(match => cleanTerm(match[1]))
-        .filter(Boolean)
-
-    if (quoted.length > 0) return quoted
-
-    return raw
-        .split(/\s*,\s*|\s+ou\s+/i)
-        .map(cleanTerm)
-        .filter(Boolean)
-}
-
-function extractVocabularyRules(prompt: string): VocabularyRule[] {
-    const rules: VocabularyRule[] = []
-    const seen = new Set<string>()
-
-    for (const rawLine of prompt.split(/\r?\n/)) {
-        const line = rawLine.trim()
-        if (!line) continue
-
-        const arrowMatch = line.match(/^(?:[-*]\s*)?(.+?)\s*(?:->|=>)\s*(.+?)\.?$/)
-        const sentenceMatch = line.match(/algo como\s+(.+?),\s*escreva sempre\s+"([^"]+)"/i)
-
-        const variants = arrowMatch
-            ? extractTerms(arrowMatch[1])
-            : sentenceMatch
-                ? extractTerms(sentenceMatch[1])
-                : []
-        const replacement = cleanTerm(arrowMatch?.[2] ?? sentenceMatch?.[2] ?? '')
-
-        if (!replacement || variants.length === 0) continue
-
-        const uniqueVariants = variants.filter(variant => {
-            const key = `${replacement.toLowerCase()}::${variant.toLowerCase()}`
-            if (seen.has(key)) return false
-            seen.add(key)
-            return variant.toLowerCase() !== replacement.toLowerCase()
-        })
-
-        if (uniqueVariants.length > 0) {
-            rules.push({ variants: uniqueVariants, replacement })
-        }
-    }
-
-    return rules
-}
-
-function escapeRegExp(value: string): string {
-    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-}
-
-function normalizeVocabularyTerms(text: string, prompt: string): string {
-    let corrected = text
-
-    for (const rule of extractVocabularyRules(prompt)) {
-        for (const variant of rule.variants) {
-            const pattern = `(^|[^\\p{L}\\p{N}_])(${escapeRegExp(variant)})(?=$|[^\\p{L}\\p{N}_])`
-            corrected = corrected.replace(new RegExp(pattern, 'giu'), (_match, prefix: string) => {
-                return `${prefix}${rule.replacement}`
-            })
-        }
-    }
-
-    return corrected
-}
-
-function stripCodeFence(text: string): string {
-    return text
-        .replace(/^```[a-z]*\s*/i, '')
-        .replace(/\s*```$/i, '')
-        .trim()
-}
-
-function stripTranscriptWrapper(text: string): string {
-    return text
-        .replace(/^\s*<transcricao>\s*/i, '')
-        .replace(/\s*<\/transcricao>\s*$/i, '')
-        .trim()
-}
-
-async function correctTranscriptWithContext(
-    text: string,
-    prompt: string,
-    apiKey: string
-): Promise<string> {
-    const locallyCorrected = normalizeVocabularyTerms(text, prompt)
-
-    if (!prompt.trim()) {
-        return locallyCorrected
-    }
-
-    try {
-        const resp = await fetchWithTimeout(GROQ_CHAT_ENDPOINT, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${apiKey}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                model: GROQ_TRANSCRIPT_CORRECTION_MODEL,
-                temperature: 0,
-                messages: [
-                    {
-                        role: 'system',
-                        content: [
-                            'Voce e uma etapa de pos-processamento de transcricao.',
-                            'Corrija apenas grafias de termos conhecidos pelo contexto previo.',
-                            'Nao reescreva, nao traduza, nao resuma e nao adicione palavras.',
-                            'Preserve idioma, pontuacao, quebras de linha e sentido.',
-                            'Responda somente com a transcricao corrigida.'
-                        ].join(' ')
-                    },
-                    {
-                        role: 'user',
-                        content: `Contexto previo/glossario:
-${prompt}
-
-Texto da transcricao para corrigir:
-${locallyCorrected}`
-                    }
-                ]
-            })
-        }, CORRECTION_TIMEOUT_MS)
-
-        const raw = await resp.text().catch(() => '')
-        if (!resp.ok) {
-            console.warn(`[groq] correcao contextual falhou ${resp.status}:`, raw.slice(0, 200))
-            return locallyCorrected
-        }
-
-        const data = JSON.parse(raw) as GroqChatCompletionResult
-        const corrected = data.choices?.[0]?.message?.content?.trim()
-
-        return corrected ? stripTranscriptWrapper(stripCodeFence(corrected)) : locallyCorrected
-    } catch (err) {
-        console.warn(
-            '[groq] correcao contextual indisponivel:',
-            err instanceof Error ? err.message : String(err)
-        )
-        return locallyCorrected
-    }
-}
-
 /**
  * Load Groq keys from comma-separated string.
  * Call once at startup or whenever settings change.
@@ -342,10 +174,7 @@ export async function transcribe(
 
     let lastErr: Error | null = null
     const models = normalizeModelList(model)
-    const settingsPrompt =
-        options.prompt === undefined
-            ? normalizeGroqSettings(await window.api.getGroqSettings()).transcriptionPrompt
-            : options.prompt
+    const settingsPrompt = options.prompt ?? ''
     const whisperPrompt = settingsPrompt ? audioEndpointPrompt(settingsPrompt) : ''
 
     for (const currentModel of models) {
@@ -385,10 +214,6 @@ export async function transcribe(
                 const data = options.response_format === 'text'
                     ? { text: raw }
                     : parseGroqTranscription(raw, currentModel)
-
-                if (settingsPrompt && data.text) {
-                    data.text = await correctTranscriptWithContext(data.text, settingsPrompt, apiKey)
-                }
 
                 if (currentModel !== models[0]) {
                     console.info(`[groq] fallback ativo -> ${currentModel}`)

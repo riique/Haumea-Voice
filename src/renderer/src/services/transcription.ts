@@ -61,7 +61,7 @@ export async function transcribeWithEngine(
         if (keys) loadGroqKeys(keys)
         const groqSettings = normalizeGroqSettings(await window.api.getGroqSettings())
         const result = await groqTranscribe(blob, groqSettings.modelPriority, {
-            prompt: groqSettings.transcriptionPrompt
+            prompt: ''
         })
         return result.text
     }
