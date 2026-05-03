@@ -28,6 +28,7 @@ export interface TranscriptionRequest {
     audioPath: string
     modelId: string
     language: string
+    temperature?: number
 }
 
 export interface TranscriptionSegment {

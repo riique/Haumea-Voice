@@ -52,7 +52,7 @@ function Card({
     children: ReactNode
 }) {
     return (
-        <div className="bg-surface border border-border p-5 mb-3 rounded-xl">
+        <div className="bg-surface border border-border p-5 mb-3 rounded-lg shadow-[0_8px_24px_rgba(31,33,28,0.04)]">
             <div className="flex items-center gap-2 mb-4">
                 {icon}
                 <span className="font-mono text-[11px] font-bold text-text-sec uppercase tracking-wider">
@@ -160,7 +160,7 @@ function ModelPriorityEditor({
 
     return (
         <div className="flex flex-col gap-4">
-            <div className="flex gap-2">
+            <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
                 <input
                     value={newName}
                     onChange={e => {
@@ -174,11 +174,11 @@ function ModelPriorityEditor({
                         }
                     }}
                     placeholder={placeholder}
-                    className="flex-1 h-10 px-3 bg-bg border border-border text-sm text-text-main placeholder:text-text-sec/40 font-mono focus:outline-none focus:border-accent transition-colors"
+                    className="min-w-0 flex-1 h-10 px-3 bg-bg border border-border text-sm text-text-main placeholder:text-text-sec/40 font-mono focus:outline-none focus:border-accent transition-colors"
                 />
                 <button
                     onClick={add}
-                    className="h-10 px-4 border border-border text-text-sec hover:text-text-main hover:border-text-sec transition-all inline-flex items-center gap-2 shrink-0"
+                    className="h-10 px-4 border border-border text-text-sec hover:text-text-main hover:border-text-sec transition-all inline-flex items-center justify-center gap-2 shrink-0"
                 >
                     <Plus size={14} />
                     Adicionar
@@ -247,8 +247,8 @@ function ModelPriorityEditor({
                 ))}
             </div>
 
-            <div className="flex items-center justify-between gap-3">
-                <span className="font-mono text-[10px] text-text-sec/60 leading-relaxed">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <span className="min-w-0 font-mono text-[10px] text-text-sec/60 leading-relaxed">
                     Padrão: {defaults.join(', ')}.
                 </span>
                 <button
@@ -294,14 +294,14 @@ function ApiKeysEditor({
 }) {
     return (
         <>
-            <div className="flex gap-2">
-                <div className="flex-1 relative">
+            <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
+                <div className="relative min-w-0 flex-1">
                     <input
                         type={show ? 'text' : 'password'}
                         value={value}
                         onChange={e => onChange(e.target.value)}
                         placeholder={placeholder}
-                        className="w-full h-10 px-3 pr-9 bg-bg border border-border text-sm text-text-main placeholder:text-text-sec/40 font-mono focus:outline-none focus:border-accent transition-colors"
+                        className="w-full min-w-0 h-10 px-3 pr-9 bg-bg border border-border text-sm text-text-main placeholder:text-text-sec/40 font-mono focus:outline-none focus:border-accent transition-colors"
                     />
                     <button
                         onClick={() => setShow(v => !v)}
@@ -313,7 +313,7 @@ function ApiKeysEditor({
                 <button
                     onClick={onSave}
                     disabled={saving || !value.trim()}
-                    className="h-10 px-5 bg-accent text-surface text-[13px] font-semibold hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                    className="h-10 px-5 bg-accent text-surface text-[13px] font-semibold hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0"
                 >
                     {saving ? <Loader2 size={14} className="animate-spin" /> : 'Salvar'}
                 </button>
@@ -652,22 +652,23 @@ export default function SettingsPage() {
         groqModels.some((model, index) => model !== savedGroqModels[index])
 
     return (
-        <div className="flex flex-col h-full overflow-y-auto p-6">
-            <div className="mb-5">
+        <div className="h-full overflow-y-auto px-5 py-5 md:px-6">
+            <div className="mx-auto flex w-full max-w-[980px] flex-col">
+                <div className="mb-5">
                 <h1 className="font-display text-lg font-bold tracking-tight text-text-main">
                     Configurações
                 </h1>
                 <p className="font-mono text-[10px] text-text-sec tracking-wider mt-0.5">
                     Aparência, integrações, Gemini e Groq
                 </p>
-            </div>
+                </div>
 
             <Card
                 icon={<Power size={15} strokeWidth={1.8} className="text-accent" />}
                 title="Inicialização"
             >
-                <div className="flex items-center justify-between">
-                    <div className="flex flex-col gap-1">
+                <div className="flex items-center justify-between gap-4">
+                    <div className="flex min-w-0 flex-col gap-1">
                         <span className="text-[13px] font-medium text-text-main">
                             Iniciar com o Windows
                         </span>
@@ -695,7 +696,7 @@ export default function SettingsPage() {
                         </span>
                     </div>
 
-                    <div className="flex gap-2">
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                         {(['gemini', 'groq', 'whisper'] as const).map(opt => {
                             const active = engine === opt
                             const labels = {
@@ -711,7 +712,7 @@ export default function SettingsPage() {
                                         await window.api.saveTranscriptionEngine(opt)
                                     }}
                                     className={`
-                                        flex-1 flex flex-col gap-1 p-3 border transition-all
+                                        min-w-0 flex flex-col gap-1 p-3 border transition-all
                                         ${active
                                             ? 'border-accent bg-accent/5'
                                             : 'border-border hover:border-text-sec/30'
@@ -745,11 +746,11 @@ export default function SettingsPage() {
                         </span>
                     </div>
 
-                    <div className="flex gap-2">
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
                         <select
                             value={selectedMic}
                             onChange={(event) => changeMic(event.target.value)}
-                            className="flex-1 h-10 px-3 bg-bg border border-border text-sm text-text-main font-mono focus:outline-none focus:border-accent transition-colors appearance-none cursor-pointer"
+                            className="min-w-0 h-10 w-full max-w-full truncate px-3 bg-bg border border-border text-sm text-text-main font-mono focus:outline-none focus:border-accent transition-colors appearance-none cursor-pointer"
                         >
                             <option value="">Padrão do sistema</option>
                             {mics.map((mic) => (
@@ -805,8 +806,8 @@ export default function SettingsPage() {
                 icon={<PanelLeft size={15} strokeWidth={1.8} className="text-accent" />}
                 title="Barra lateral"
             >
-                <div className="flex items-center justify-between">
-                    <div className="flex flex-col gap-1">
+                <div className="flex items-center justify-between gap-4">
+                    <div className="flex min-w-0 flex-col gap-1">
                         <span className="text-[13px] font-medium text-text-main">
                             Modo compacto
                         </span>
@@ -843,8 +844,8 @@ export default function SettingsPage() {
                 icon={<Monitor size={15} strokeWidth={1.8} className="text-accent" />}
                 title="Widget flutuante"
             >
-                <div className="flex items-center justify-between">
-                    <div className="flex flex-col gap-1">
+                <div className="flex items-center justify-between gap-4">
+                    <div className="flex min-w-0 flex-col gap-1">
                         <span className="text-[13px] font-medium text-text-main">
                             Apenas ícone
                         </span>
@@ -951,8 +952,8 @@ export default function SettingsPage() {
                     </span>
                 </div>
 
-                <div className="mt-4 flex items-center justify-between gap-3">
-                    <span className="font-mono text-[10px] text-text-sec/60 leading-relaxed">
+                <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <span className="min-w-0 font-mono text-[10px] text-text-sec/60 leading-relaxed">
                         Deixe vazio para manter a transcrição sem viés de vocabulário.
                     </span>
                     <button
@@ -1002,8 +1003,8 @@ export default function SettingsPage() {
                     </div>
                 </div>
 
-                <div className="mt-4 flex items-center justify-between gap-3">
-                    <span className="font-mono text-[10px] text-text-sec/60 leading-relaxed">
+                <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <span className="min-w-0 font-mono text-[10px] text-text-sec/60 leading-relaxed">
                         Esses textos passam a ser usados nas próximas transcrições e avaliações.
                     </span>
                     <button
@@ -1077,6 +1078,7 @@ export default function SettingsPage() {
                     placeholder="Ex.: whisper-large-v3"
                 />
             </Card>
+            </div>
         </div>
     )
 }

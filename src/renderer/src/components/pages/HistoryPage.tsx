@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Clock, Copy, Trash2, RotateCcw, AlertCircle, Sparkles, Loader2 } from 'lucide-react'
+import { Clock, Copy, Trash2, RotateCcw, AlertCircle, Sparkles, Loader2, Search } from 'lucide-react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { generateFeedback } from '../../services/gemini'
 import { transcribeWithNonEmptyRetry } from '../../services/transcription'
+import { applyDictionary } from '../../services/dictionary'
 
 interface HistoryEntry {
     text: string
@@ -47,6 +48,7 @@ export default function HistoryPage() {
     const [retrying, setRetrying] = useState<string | null>(null)
     const [evaluating, setEvaluating] = useState<string | null>(null)
     const [feedbackErrors, setFeedbackErrors] = useState<Record<string, string>>({})
+    const [query, setQuery] = useState('')
 
     const load = () => window.api.getHistory().then(setHistory)
 
@@ -94,7 +96,8 @@ export default function HistoryPage() {
 
             const blob = b64ToBlob(b64)
             const engine = await window.api.getTranscriptionEngine()
-            const text = await transcribeWithNonEmptyRetry(blob, engine, 2)
+            const dictionary = await window.api.getDictionary()
+            const text = applyDictionary(await transcribeWithNonEmptyRetry(blob, engine, 2), dictionary)
             if (!text.trim()) {
                 throw new Error('A transcrição voltou vazia: nenhuma palavra foi detectada.')
             }
@@ -156,10 +159,22 @@ export default function HistoryPage() {
 
     const errorCount = history.filter((e) => e.error).length
     const successCount = history.filter((e) => !e.error).length
+    const normalizedQuery = query.trim().toLowerCase()
+    const filteredHistory = normalizedQuery
+        ? history.filter((entry) => {
+            const haystack = [
+                entry.text,
+                entry.error,
+                entry.feedback,
+                formatDate(entry.date)
+            ].filter(Boolean).join(' ').toLowerCase()
+            return haystack.includes(normalizedQuery)
+        })
+        : history
 
     return (
         <div className="flex flex-col h-full overflow-y-auto p-6">
-            <div className="flex items-center justify-between mb-5">
+            <div className="flex flex-col gap-3 mb-5 lg:flex-row lg:items-end lg:justify-between">
                 <div>
                     <h1 className="font-display text-lg font-bold tracking-tight text-text-main">
                         Histórico
@@ -173,15 +188,29 @@ export default function HistoryPage() {
                         )}
                     </p>
                 </div>
-                {history.length > 0 && (
-                    <button
-                        onClick={clearHistory}
-                        className="flex items-center gap-1.5 h-8 px-3 border border-border text-[11px] font-semibold text-text-sec hover:text-accent hover:border-accent/40 transition-colors"
-                    >
-                        <Trash2 size={12} />
-                        Limpar tudo
-                    </button>
-                )}
+                <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
+                    <div className="relative min-w-0 sm:w-[300px]">
+                        <Search
+                            size={13}
+                            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-sec/60"
+                        />
+                        <input
+                            value={query}
+                            onChange={(event) => setQuery(event.target.value)}
+                            placeholder="Pesquisar historico"
+                            className="h-9 w-full min-w-0 border border-border bg-surface pl-9 pr-3 font-mono text-[11px] text-text-main outline-none transition-colors placeholder:text-text-sec/40 focus:border-accent"
+                        />
+                    </div>
+                    {history.length > 0 && (
+                        <button
+                            onClick={clearHistory}
+                            className="flex h-9 items-center justify-center gap-1.5 border border-border px-3 text-[11px] font-semibold text-text-sec transition-colors hover:border-accent/40 hover:text-accent"
+                        >
+                            <Trash2 size={12} />
+                            Limpar tudo
+                        </button>
+                    )}
+                </div>
             </div>
 
             {history.length === 0 ? (
@@ -192,9 +221,14 @@ export default function HistoryPage() {
                         As transcrições serão salvas automaticamente
                     </p>
                 </div>
+            ) : filteredHistory.length === 0 ? (
+                <div className="flex-1 flex flex-col items-center justify-center text-center">
+                    <Search size={30} className="text-border mb-3" />
+                    <p className="text-sm text-text-sec">Nenhum resultado encontrado</p>
+                </div>
             ) : (
                 <div className="space-y-2.5">
-                    {history.map((entry, i) => {
+                    {filteredHistory.map((entry, i) => {
                         const isError = !!entry.error
                         const isRetrying = retrying === entry.date
                         const isEvaluating = evaluating === entry.date

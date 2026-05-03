@@ -1,5 +1,9 @@
 appId: com.haumea.voice
 productName: Haumea Voice
+publish:
+  provider: github
+  owner: riique
+  repo: Haumea-Voice
 directories:
   buildResources: build
 files:

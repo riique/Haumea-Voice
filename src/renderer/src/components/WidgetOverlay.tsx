@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Square, X, AlertTriangle } from 'lucide-react'
+import { Check, X, AlertTriangle } from 'lucide-react'
 import HaumeaIcon from './HaumeaIcon'
 
 function pad(n: number): string {
@@ -68,8 +68,8 @@ export default function WidgetOverlay() {
         return () => clearInterval(id)
     }, [recording])
 
-    const stop = useCallback(() => {
-        window.api.requestStopRecording()
+    const finishAndTranscribe = useCallback(() => {
+        window.api.requestToggleRecording()
     }, [])
 
     const cancel = useCallback(() => {
@@ -149,17 +149,17 @@ export default function WidgetOverlay() {
                                 {fmt(elapsed)}
                             </span>
 
-                            {/* Stop */}
+                            {/* Finish */}
                             <button
-                                onClick={stop}
+                                onClick={finishAndTranscribe}
                                 className="p-1 rounded-md transition-colors"
                                 style={{
                                     WebkitAppRegion: 'no-drag',
                                     color: 'rgba(255,255,255,0.7)'
                                 } as React.CSSProperties}
-                                title="Parar e transcrever"
+                                title="Finalizar e transcrever"
                             >
-                                <Square size={9} fill="currentColor" strokeWidth={0} />
+                                <Check size={11} strokeWidth={2.5} />
                             </button>
 
                             {/* Cancel */}

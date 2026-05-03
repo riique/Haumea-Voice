@@ -123,7 +123,7 @@ export default function AudioVisualizer({
             ref={canvasRef}
             width={width}
             height={height}
-            className="block"
+            className="block h-full w-full"
         />
     )
 }

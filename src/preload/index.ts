@@ -1,6 +1,9 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { GeminiSettings } from '../shared/gemini'
 import type { GroqSettings } from '../shared/groq'
+import type { DictionaryEntry } from '../shared/dictionary'
+import type { PrepareMicrophoneRequest, PrepareMicrophoneResult } from '../shared/microphone'
+import type { UpdateStatus } from '../shared/update'
 import type {
     TranscriptionRequest,
     TranscriptionResult,
@@ -16,6 +19,7 @@ export interface HistoryEntry {
     date: string
     error?: string
     audioId?: string
+    durationSeconds?: number
     feedback?: string
     feedbackCreatedAt?: string
 }
@@ -34,10 +38,14 @@ const api = {
 
     getShortcut: (): Promise<string> => ipcRenderer.invoke('get-shortcut'),
     saveShortcut: (shortcut: string): Promise<boolean> => ipcRenderer.invoke('save-shortcut', shortcut),
+    getStopShortcut: (): Promise<string> => ipcRenderer.invoke('get-stop-shortcut'),
+    saveStopShortcut: (shortcut: string): Promise<boolean> => ipcRenderer.invoke('save-stop-shortcut', shortcut),
 
     requestToggleRecording: (): Promise<boolean> => ipcRenderer.invoke('request-toggle-recording'),
     requestStopRecording: (): Promise<boolean> => ipcRenderer.invoke('request-stop-recording'),
     requestCancelRecording: (): Promise<boolean> => ipcRenderer.invoke('request-cancel-recording'),
+    prepareMicrophoneForTranscription: (request: PrepareMicrophoneRequest): Promise<PrepareMicrophoneResult> =>
+        ipcRenderer.invoke('prepare-microphone-for-transcription', request),
 
     onSetRecording: (cb: (isRecording: boolean, cancelled: boolean) => void) => {
         const handler = (_e: Electron.IpcRendererEvent, val: boolean, cancelled: boolean) => cb(val, cancelled ?? false)
@@ -47,6 +55,15 @@ const api = {
 
     copyAndPaste: (text: string): Promise<boolean> => ipcRenderer.invoke('copy-and-paste', text),
     copyToClipboard: (text: string): Promise<boolean> => ipcRenderer.invoke('copy-to-clipboard', text),
+
+    getDictionary: (): Promise<DictionaryEntry[]> => ipcRenderer.invoke('get-dictionary'),
+    saveDictionary: (entries: DictionaryEntry[]): Promise<boolean> => ipcRenderer.invoke('save-dictionary', entries),
+
+    onDictionaryChanged: (cb: (entries: DictionaryEntry[]) => void) => {
+        const handler = (_e: Electron.IpcRendererEvent, entries: DictionaryEntry[]) => cb(entries)
+        ipcRenderer.on('dictionary-changed', handler)
+        return () => { ipcRenderer.removeListener('dictionary-changed', handler) }
+    },
 
     getHistory: (): Promise<HistoryEntry[]> => ipcRenderer.invoke('get-history'),
     addHistory: (entry: HistoryEntry): Promise<boolean> => ipcRenderer.invoke('add-history', entry),
@@ -92,6 +109,16 @@ const api = {
     },
 
     broadcastTranscribing: (val: boolean): Promise<void> => ipcRenderer.invoke('broadcast-transcribing', val),
+
+    getUpdateStatus: (): Promise<UpdateStatus> => ipcRenderer.invoke('get-update-status'),
+    checkForUpdates: (): Promise<UpdateStatus> => ipcRenderer.invoke('check-for-updates'),
+    installUpdate: (): Promise<boolean> => ipcRenderer.invoke('install-update'),
+
+    onUpdateStatus: (cb: (status: UpdateStatus) => void) => {
+        const handler = (_e: Electron.IpcRendererEvent, status: UpdateStatus) => cb(status)
+        ipcRenderer.on('update-status', handler)
+        return () => { ipcRenderer.removeListener('update-status', handler) }
+    },
 
     onTranscribing: (cb: (val: boolean) => void) => {
         const handler = (_e: Electron.IpcRendererEvent, val: boolean) => cb(val)

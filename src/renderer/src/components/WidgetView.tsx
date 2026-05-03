@@ -1,4 +1,4 @@
-import { Square, Circle, X } from 'lucide-react'
+import { Check, Circle, X } from 'lucide-react'
 import AudioVisualizer from './AudioVisualizer'
 
 interface Props {
@@ -8,6 +8,7 @@ interface Props {
     onStop: () => void
     onCancel: () => void
     shortcut: string
+    stopShortcut: string
 }
 
 function pad(n: number): string {
@@ -48,13 +49,23 @@ export default function WidgetView({ isRecording, elapsed, onToggle, onStop, onC
                         REC
                     </button>
                 ) : (
-                    <button
-                        onClick={onStop}
-                        className="flex items-center gap-1.5 h-7 px-3 bg-text-main text-bg text-[11px] font-bold tracking-tight"
-                    >
-                        <Square size={8} fill="currentColor" strokeWidth={0} />
-                        PARAR
-                    </button>
+                    <>
+                        <button
+                            onClick={onToggle}
+                            className="flex items-center gap-1.5 h-7 px-3 bg-text-main text-bg text-[11px] font-bold tracking-tight"
+                            title="Transcrever"
+                        >
+                            <Check size={11} strokeWidth={2.5} />
+                            TEXTO
+                        </button>
+                        <button
+                            onClick={onStop}
+                            className="flex h-7 w-7 items-center justify-center border border-border text-text-sec transition-colors hover:text-text-main"
+                            title="Cancelar"
+                        >
+                            <X size={12} strokeWidth={2.5} />
+                        </button>
+                    </>
                 )}
 
                 <button

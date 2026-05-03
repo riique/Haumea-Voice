@@ -248,6 +248,7 @@ export async function transcribe(
             modelPath: dir,
             audioPath: req.audioPath,
             language: req.language,
+            temperature: req.temperature ?? 0.1,
             device: 'auto',
             computeType: 'auto'
         }

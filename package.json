@@ -1,6 +1,6 @@
 {
   "name": "haumea-voice",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Haumea Voice — Audio recording, transcription and communication analysis",
   "main": "./out/main/index.js",
   "scripts": {
@@ -15,6 +15,7 @@
   "dependencies": {
     "@google/genai": "^1.0.0",
     "electron-store": "^10.0.0",
+    "electron-updater": "^6.8.3",
     "framer-motion": "^12.34.3",
     "lucide-react": "^0.468.0",
     "react": "^19.0.0",

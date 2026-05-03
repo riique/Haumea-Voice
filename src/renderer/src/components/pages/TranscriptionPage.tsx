@@ -24,6 +24,7 @@ import type {
     SystemCheck
 } from '../../../../shared/whisper'
 import { WHISPER_LANGUAGES } from '../../../../shared/whisper'
+import { cleanTranscriptionArtifacts } from '../../services/postprocess'
 
 type ModelWithState = WhisperModel & { state: ModelState }
 
@@ -161,11 +162,15 @@ export default function TranscriptionPage() {
             const res = await window.api.whisperTranscribe({
                 audioPath,
                 modelId: selectedModel,
-                language
+                language,
+                temperature: 0.1
             })
 
             if (res.ok && res.result) {
-                setResult(res.result)
+                setResult({
+                    ...res.result,
+                    text: cleanTranscriptionArtifacts(res.result.text)
+                })
             } else {
                 setError(res.error || 'Erro desconhecido na transcrição')
             }

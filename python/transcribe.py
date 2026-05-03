@@ -164,6 +164,7 @@ class TranscriptionServer:
         model_path = cmd["modelPath"]
         audio_path = cmd["audioPath"]
         language = cmd.get("language", "auto")
+        temperature = float(cmd.get("temperature", 0.1))
         device = cmd.get("device", "auto")
         compute_type = cmd.get("computeType", "auto")
 
@@ -202,7 +203,7 @@ class TranscriptionServer:
             effective_path,
             language=lang,
             beam_size=beam,
-            temperature=0,
+            temperature=temperature,
             condition_on_previous_text=False,
             vad_filter=True,
             vad_parameters=dict(

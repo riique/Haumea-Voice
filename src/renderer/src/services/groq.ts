@@ -80,8 +80,8 @@ function compactDetail(detail: string): string {
 function buildGroqError(status: number, detail: string, model: string): Error {
     const suffix = detail.trim() ? `: ${compactDetail(detail)}` : ''
     const err = new Error(`Groq API ${status} em ${model}${suffix}`)
-    ;(err as Record<string, unknown>).status = status
-    ;(err as Record<string, unknown>).detail = detail
+    ;(err as unknown as Record<string, unknown>).status = status
+    ;(err as unknown as Record<string, unknown>).detail = detail
     return err
 }
 

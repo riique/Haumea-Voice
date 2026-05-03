@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
-import { LayoutDashboard, Clock, Keyboard, Settings, FileAudio } from 'lucide-react'
+import { LayoutDashboard, Clock, Keyboard, Settings, FileAudio, BookOpenText } from 'lucide-react'
 import HaumeaIcon from './HaumeaIcon'
 
-export type Route = 'overview' | 'transcription' | 'history' | 'shortcuts' | 'settings'
+export type Route = 'overview' | 'transcription' | 'history' | 'dictionary' | 'shortcuts' | 'settings'
 
 interface Props {
     active: Route
@@ -13,6 +13,7 @@ const nav: { id: Route; label: string; icon: typeof LayoutDashboard }[] = [
     { id: 'overview', label: 'In\u00edcio', icon: LayoutDashboard },
     { id: 'transcription', label: 'Transcri\u00e7\u00e3o', icon: FileAudio },
     { id: 'history', label: 'Hist\u00f3rico', icon: Clock },
+    { id: 'dictionary', label: 'Dicion\u00e1rio', icon: BookOpenText },
     { id: 'shortcuts', label: 'Atalhos', icon: Keyboard },
     { id: 'settings', label: 'Configura\u00e7\u00f5es', icon: Settings }
 ]
@@ -77,7 +78,7 @@ export default function Sidebar({ active, onChange }: Props) {
             {!compact && (
                 <div className="px-5 pb-4">
                     <span className="font-mono text-[9px] text-text-sec/50 tracking-wider uppercase">
-                        v0.1.0 — local
+                        v1.0.1 - local
                     </span>
                 </div>
             )}

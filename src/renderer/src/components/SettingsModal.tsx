@@ -15,7 +15,7 @@ function keysToElectron(keys: Set<string>): string {
     if (keys.has('Alt')) parts.push('Alt')
     if (keys.has('Shift')) parts.push('Shift')
 
-    for (const k of keys) {
+    for (const k of Array.from(keys)) {
         if (!MODIFIER_KEYS.has(k)) {
             parts.push(k.length === 1 ? k.toUpperCase() : k)
         }
@@ -63,8 +63,9 @@ export default function SettingsModal({ onClose, shortcut, onShortcutChange }: P
             e.stopPropagation()
             pressedRef.current.add(e.key)
 
-            const hasModifier = [...pressedRef.current].some(k => MODIFIER_KEYS.has(k))
-            const hasRegular = [...pressedRef.current].some(k => !MODIFIER_KEYS.has(k))
+            const pressedKeys = Array.from(pressedRef.current)
+            const hasModifier = pressedKeys.some(k => MODIFIER_KEYS.has(k))
+            const hasRegular = pressedKeys.some(k => !MODIFIER_KEYS.has(k))
 
             if (hasModifier && hasRegular) {
                 const combo = keysToElectron(pressedRef.current)

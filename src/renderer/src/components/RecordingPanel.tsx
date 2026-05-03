@@ -1,5 +1,5 @@
 import { useCallback } from 'react'
-import { Mic, Square, Circle, Loader2, X } from 'lucide-react'
+import { Mic, Check, Circle, Loader2, X } from 'lucide-react'
 import AudioVisualizer from './AudioVisualizer'
 
 interface Props {
@@ -7,9 +7,9 @@ interface Props {
     elapsed: number
     onToggle: () => void
     onStop: () => void
-    onCancel: () => void
     transcribing: boolean
     shortcut: string
+    stopShortcut: string
     activeStream: MediaStream | null
 }
 
@@ -36,24 +36,24 @@ export default function RecordingPanel({
     elapsed,
     onToggle,
     onStop,
-    onCancel,
     transcribing,
     shortcut,
+    stopShortcut,
     activeStream
 }: Props) {
-    const handleStop = useCallback(() => {
+    const handleCancel = useCallback(() => {
         onStop()
     }, [onStop])
 
     return (
-        <div className="flex flex-col items-center gap-8">
-            <div className="font-mono text-5xl font-bold tracking-widest text-text-main tabular-nums">
+        <div className="flex w-full max-w-[420px] flex-col items-center gap-5">
+            <div className="font-mono text-4xl font-bold tracking-widest text-text-main tabular-nums">
                 {formatTime(elapsed)}
             </div>
 
-            <div className="w-[320px] h-[80px] bg-sidebar border border-border flex items-center justify-center">
+            <div className="w-full max-w-[340px] h-[76px] bg-sidebar border border-border flex items-center justify-center rounded-lg overflow-hidden">
                 {isRecording ? (
-                    <AudioVisualizer isRecording={isRecording} stream={activeStream} width={300} height={70} />
+                    <AudioVisualizer isRecording={isRecording} stream={activeStream} width={320} height={64} />
                 ) : transcribing ? (
                     <div className="flex items-center gap-2 text-accent">
                         <Loader2 size={14} className="animate-spin" />
@@ -68,7 +68,7 @@ export default function RecordingPanel({
                 )}
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex flex-wrap items-center justify-center gap-3">
                 {!isRecording ? (
                     <button
                         onClick={onToggle}
@@ -82,16 +82,17 @@ export default function RecordingPanel({
                 ) : (
                     <>
                         <button
-                            onClick={handleStop}
+                            onClick={onToggle}
                             className="flex items-center gap-2.5 h-11 px-6 bg-text-main text-bg font-semibold text-sm tracking-tight hover:bg-text-sec transition-colors"
+                            title={`Finalizar e transcrever (${shortcutLabel(shortcut)})`}
                         >
-                            <Square size={10} fill="currentColor" strokeWidth={0} />
-                            Parar
+                            <Check size={14} strokeWidth={2.5} />
+                            Transcrever
                         </button>
                         <button
-                            onClick={onCancel}
+                            onClick={handleCancel}
                             className="flex items-center gap-2 h-11 px-4 border border-border text-text-sec text-sm font-semibold hover:text-text-main hover:border-text-sec transition-colors"
-                            title="Cancelar grava\u00e7\u00e3o (sem transcrever)"
+                            title={`Cancelar grava\u00e7\u00e3o (${shortcutLabel(stopShortcut)})`}
                         >
                             <X size={12} strokeWidth={2.5} />
                             Cancelar
@@ -106,8 +107,8 @@ export default function RecordingPanel({
                 )}
             </div>
 
-            <p className="font-mono text-[10px] text-text-sec tracking-wider">
-                Atalho: {shortcutLabel(shortcut)}
+            <p className="font-mono text-[10px] text-text-sec tracking-wider text-center leading-relaxed">
+                Iniciar/transcrever: {shortcutLabel(shortcut)} <span className="text-border">/</span> Cancelar: {shortcutLabel(stopShortcut)}
             </p>
         </div>
     )

@@ -10,11 +10,13 @@ import {
     screen,
     powerMonitor
 } from 'electron'
+import { autoUpdater } from 'electron-updater'
 import { join } from 'path'
 import { exec } from 'child_process'
 import { writeFileSync, readFileSync, unlinkSync, existsSync, mkdirSync } from 'fs'
 import { tmpdir } from 'os'
 import Store from 'electron-store'
+import type { DictionaryEntry } from '../shared/dictionary'
 import {
     DEFAULT_GEMINI_SETTINGS,
     cloneGeminiSettings,
@@ -27,6 +29,9 @@ import {
     normalizeGroqSettings,
     type GroqSettings
 } from '../shared/groq'
+import type { PrepareMicrophoneRequest } from '../shared/microphone'
+import type { UpdateStatus } from '../shared/update'
+import { prepareSystemMicrophone } from './microphone'
 import { setupWhisperIPC } from './whisper/ipc'
 
 // Prevent Windows WASAPI "communications" classification that triggers
@@ -46,21 +51,27 @@ interface HistoryEntry {
     date: string
     error?: string
     audioId?: string
+    durationSeconds?: number
     feedback?: string
     feedbackCreatedAt?: string
 }
+
+const DEFAULT_RECORD_SHORTCUT = 'CmdOrCtrl+Shift+R'
+const DEFAULT_STOP_SHORTCUT = 'CmdOrCtrl+Shift+S'
 
 const store = new Store({
     defaults: {
         apiKey: '',
         groqApiKeys: '',
-        shortcut: 'CmdOrCtrl+Shift+R',
+        shortcut: DEFAULT_RECORD_SHORTCUT,
+        stopShortcut: DEFAULT_STOP_SHORTCUT,
         history: [] as HistoryEntry[],
         overlayPos: null as { x: number; y: number } | null,
         sidebarCompact: false,
         widgetIconOnly: false,
         autoLaunch: false,
         selectedMic: '', // empty = system default
+        dictionary: [] as DictionaryEntry[],
         transcriptionEngine: 'gemini' as 'gemini' | 'whisper' | 'groq',
         geminiSettings: cloneGeminiSettings(DEFAULT_GEMINI_SETTINGS),
         groqSettings: cloneGroqSettings(DEFAULT_GROQ_SETTINGS)
@@ -119,7 +130,8 @@ let tray: Tray | null = null
 let isWidgetMode = false
 let isQuitting = false
 let isRecordingState = false
-let currentShortcut = store.get('shortcut', 'CmdOrCtrl+Shift+R') as string
+let currentShortcut = store.get('shortcut', DEFAULT_RECORD_SHORTCUT) as string
+let currentStopShortcut = store.get('stopShortcut', DEFAULT_STOP_SHORTCUT) as string
 
 const WIN = { normal: { w: 860, h: 620 }, widget: { w: 340, h: 140 } }
 const OVERLAY = { padding: 4, contentHeight: 34 }
@@ -217,6 +229,122 @@ function cancelRecordingState(): void {
     if (!isRecordingState) return
     isRecordingState = false
     broadcastRecording(true)
+}
+
+let updateStatus: UpdateStatus = {
+    status: app.isPackaged ? 'checking' : 'not-available',
+    currentVersion: app.getVersion(),
+    mandatory: false,
+    message: app.isPackaged
+        ? 'Verificando atualizacao...'
+        : 'Atualizacoes automaticas ficam ativas na versao instalada.'
+}
+
+function setUpdateStatus(patch: Partial<UpdateStatus>): UpdateStatus {
+    updateStatus = {
+        ...updateStatus,
+        ...patch,
+        currentVersion: app.getVersion()
+    }
+    mainWindow?.webContents.send('update-status', updateStatus)
+    overlayWindow?.webContents.send('update-status', updateStatus)
+    return updateStatus
+}
+
+async function checkForAppUpdates(): Promise<UpdateStatus> {
+    if (!app.isPackaged) {
+        return setUpdateStatus({
+            status: 'not-available',
+            mandatory: false,
+            message: 'Atualizacoes automaticas ficam ativas na versao instalada.'
+        })
+    }
+
+    setUpdateStatus({
+        status: 'checking',
+        mandatory: false,
+        percent: undefined,
+        message: 'Verificando atualizacao...'
+    })
+
+    try {
+        await autoUpdater.checkForUpdates()
+    } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        setUpdateStatus({
+            status: 'error',
+            mandatory: updateStatus.mandatory,
+            message
+        })
+    }
+
+    return updateStatus
+}
+
+function setupAutoUpdater(): void {
+    autoUpdater.autoDownload = true
+    autoUpdater.autoInstallOnAppQuit = true
+
+    autoUpdater.on('checking-for-update', () => {
+        setUpdateStatus({
+            status: 'checking',
+            mandatory: false,
+            percent: undefined,
+            message: 'Verificando atualizacao...'
+        })
+    })
+
+    autoUpdater.on('update-available', (info) => {
+        setUpdateStatus({
+            status: 'downloading',
+            mandatory: true,
+            latestVersion: info.version,
+            percent: 0,
+            message: 'Atualizacao obrigatoria encontrada. Baixando...'
+        })
+    })
+
+    autoUpdater.on('download-progress', (progress) => {
+        setUpdateStatus({
+            status: 'downloading',
+            mandatory: true,
+            percent: Math.max(0, Math.min(100, progress.percent)),
+            bytesPerSecond: progress.bytesPerSecond,
+            message: 'Baixando atualizacao...'
+        })
+    })
+
+    autoUpdater.on('update-downloaded', (info) => {
+        setUpdateStatus({
+            status: 'downloaded',
+            mandatory: true,
+            latestVersion: info.version,
+            percent: 100,
+            message: 'Atualizacao baixada. Instalando...'
+        })
+
+        setTimeout(() => {
+            autoUpdater.quitAndInstall(false, true)
+        }, 1200)
+    })
+
+    autoUpdater.on('update-not-available', (info) => {
+        setUpdateStatus({
+            status: 'not-available',
+            mandatory: false,
+            latestVersion: info.version,
+            percent: undefined,
+            message: 'Haumea Voice esta atualizado.'
+        })
+    })
+
+    autoUpdater.on('error', (err) => {
+        setUpdateStatus({
+            status: 'error',
+            mandatory: updateStatus.mandatory,
+            message: err.message
+        })
+    })
 }
 
 // Windows
@@ -387,8 +515,12 @@ function createTray(): void {
             },
             { type: 'separator' },
             {
-                label: 'Gravar / Parar',
+                label: 'Gravar / Transcrever',
                 click: () => toggleRecordingState()
+            },
+            {
+                label: 'Cancelar gravação',
+                click: () => cancelRecordingState()
             },
             { type: 'separator' },
             {
@@ -402,15 +534,74 @@ function createTray(): void {
 
 // Shortcuts
 
-function registerShortcut(shortcut: string): boolean {
-    globalShortcut.unregisterAll()
+function sameAccelerator(a: string, b: string): boolean {
+    return a.trim().toLowerCase() === b.trim().toLowerCase()
+}
+
+function tryRegisterShortcut(shortcut: string, action: () => void): boolean {
+    const nextShortcut = shortcut.trim()
+    if (!nextShortcut) return false
     try {
-        globalShortcut.register(shortcut, toggleRecordingState)
-        return true
+        return globalShortcut.register(nextShortcut, action)
     } catch {
-        globalShortcut.register('CmdOrCtrl+Shift+R', toggleRecordingState)
         return false
     }
+}
+
+function registerStoredShortcuts(): void {
+    globalShortcut.unregisterAll()
+
+    currentShortcut = currentShortcut.trim() || DEFAULT_RECORD_SHORTCUT
+    currentStopShortcut = currentStopShortcut.trim() || DEFAULT_STOP_SHORTCUT
+
+    let recordRegistered = tryRegisterShortcut(currentShortcut, toggleRecordingState)
+    if (!recordRegistered && !sameAccelerator(currentShortcut, DEFAULT_RECORD_SHORTCUT)) {
+        currentShortcut = DEFAULT_RECORD_SHORTCUT
+        recordRegistered = tryRegisterShortcut(currentShortcut, toggleRecordingState)
+        if (recordRegistered) store.set('shortcut', currentShortcut)
+    }
+
+    if (!sameAccelerator(currentShortcut, currentStopShortcut)) {
+        tryRegisterShortcut(currentStopShortcut, cancelRecordingState)
+    }
+}
+
+function saveRecordShortcut(shortcut: string): boolean {
+    const nextShortcut = shortcut.trim()
+    if (!nextShortcut || sameAccelerator(nextShortcut, currentStopShortcut)) return false
+
+    const previousShortcut = currentShortcut
+    globalShortcut.unregister(previousShortcut)
+
+    const ok = tryRegisterShortcut(nextShortcut, toggleRecordingState)
+    if (ok) {
+        currentShortcut = nextShortcut
+        store.set('shortcut', nextShortcut)
+        return true
+    }
+
+    tryRegisterShortcut(previousShortcut, toggleRecordingState)
+    return false
+}
+
+function saveStopShortcut(shortcut: string): boolean {
+    const nextShortcut = shortcut.trim()
+    if (!nextShortcut || sameAccelerator(nextShortcut, currentShortcut)) return false
+
+    const previousShortcut = currentStopShortcut
+    globalShortcut.unregister(previousShortcut)
+
+    const ok = tryRegisterShortcut(nextShortcut, cancelRecordingState)
+    if (ok) {
+        currentStopShortcut = nextShortcut
+        store.set('stopShortcut', nextShortcut)
+        return true
+    }
+
+    if (!sameAccelerator(previousShortcut, currentShortcut)) {
+        tryRegisterShortcut(previousShortcut, cancelRecordingState)
+    }
+    return false
 }
 
 // Paste helper
@@ -442,17 +633,34 @@ function setupIPC(): void {
 
     ipcMain.handle('get-shortcut', () => currentShortcut)
     ipcMain.handle('save-shortcut', (_e, s: string) => {
-        const ok = registerShortcut(s)
-        if (ok) { currentShortcut = s; store.set('shortcut', s) }
-        return ok
+        return saveRecordShortcut(s)
+    })
+    ipcMain.handle('get-stop-shortcut', () => currentStopShortcut)
+    ipcMain.handle('save-stop-shortcut', (_e, s: string) => {
+        return saveStopShortcut(s)
     })
 
     ipcMain.handle('request-toggle-recording', () => { toggleRecordingState(); return isRecordingState })
-    ipcMain.handle('request-stop-recording', () => { stopRecordingState(); return false })
+    ipcMain.handle('request-stop-recording', () => { cancelRecordingState(); return false })
     ipcMain.handle('request-cancel-recording', () => { cancelRecordingState(); return false })
+    ipcMain.handle('prepare-microphone-for-transcription', async (_e, request: PrepareMicrophoneRequest) => {
+        const result = await prepareSystemMicrophone(request)
+        if (result.warnings.length > 0) {
+            console.warn('[microphone]', result.warnings.join(' | '))
+        }
+        return result
+    })
 
     ipcMain.handle('copy-and-paste', (_e, text: string) => { pasteToActiveWindow(text); return true })
     ipcMain.handle('copy-to-clipboard', (_e, text: string) => { clipboard.writeText(text); return true })
+
+    ipcMain.handle('get-dictionary', () => store.get('dictionary', []))
+    ipcMain.handle('save-dictionary', (_e, entries: DictionaryEntry[]) => {
+        store.set('dictionary', entries)
+        mainWindow?.webContents.send('dictionary-changed', entries)
+        overlayWindow?.webContents.send('dictionary-changed', entries)
+        return true
+    })
 
     ipcMain.handle('get-history', () => store.get('history', []))
     ipcMain.handle('add-history', (_e, entry: HistoryEntry) => {
@@ -541,6 +749,15 @@ function setupIPC(): void {
         if (!val) reassertOverlay()
     })
 
+    ipcMain.handle('get-update-status', () => updateStatus)
+    ipcMain.handle('check-for-updates', () => checkForAppUpdates())
+    ipcMain.handle('install-update', () => {
+        if (updateStatus.status === 'downloaded') {
+            autoUpdater.quitAndInstall(false, true)
+        }
+        return true
+    })
+
     ipcMain.handle('toggle-widget-mode', () => {
         if (!mainWindow) return false
         isWidgetMode = !isWidgetMode
@@ -614,7 +831,14 @@ app.whenReady().then(() => {
     createWindow()
     createOverlay()
     createTray()
-    registerShortcut(currentShortcut)
+    registerStoredShortcuts()
+    setupAutoUpdater()
+    setTimeout(() => {
+        checkForAppUpdates().catch((err) => {
+            const message = err instanceof Error ? err.message : String(err)
+            setUpdateStatus({ status: 'error', mandatory: false, message })
+        })
+    }, 1500)
 
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) createWindow()

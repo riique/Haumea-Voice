@@ -5,12 +5,17 @@ import HistoryPage from './components/pages/HistoryPage'
 import ShortcutsPage from './components/pages/ShortcutsPage'
 import SettingsPage from './components/pages/SettingsPage'
 import TranscriptionPage from './components/pages/TranscriptionPage'
+import DictionaryPage from './components/pages/DictionaryPage'
 import WidgetView from './components/WidgetView'
 import WidgetOverlay from './components/WidgetOverlay'
+import UpdateGate from './components/UpdateGate'
 import {
     transcribeWithNonEmptyRetry,
     type TranscriptionEngine
 } from './services/transcription'
+import { applyDictionary } from './services/dictionary'
+import { prepareMicrophoneForTranscription } from './services/microphone'
+import type { DictionaryEntry } from '../../shared/dictionary'
 
 const IS_OVERLAY = window.location.hash === '#overlay'
 
@@ -63,8 +68,10 @@ export default function App() {
     const [transcribing, setTranscribing] = useState(false)
     const [error, setError] = useState('')
     const [shortcut, setShortcut] = useState('CmdOrCtrl+Shift+R')
+    const [stopShortcut, setStopShortcut] = useState('CmdOrCtrl+Shift+S')
     const [micDeviceId, setMicDeviceId] = useState('')
     const [activeStream, setActiveStream] = useState<MediaStream | null>(null)
+    const [dictionary, setDictionary] = useState<DictionaryEntry[]>([])
 
     const transcribingRef = useRef(false)
     const cancelledRef = useRef(false)
@@ -73,14 +80,21 @@ export default function App() {
     const chunksRef = useRef<Blob[]>([])
     const streamRef = useRef<MediaStream | null>(null)
     const engineRef = useRef<TranscriptionEngine>('gemini')
+    const recordingStartedAtRef = useRef<number | null>(null)
 
     useEffect(() => {
         window.api.getShortcut().then(setShortcut)
+        window.api.getStopShortcut().then(setStopShortcut)
         window.api.getSelectedMic().then(setMicDeviceId)
         window.api.getTranscriptionEngine().then(e => { engineRef.current = e })
+        window.api.getDictionary().then(setDictionary)
 
         const unsub = window.api.onTranscriptionEngineChanged((e) => { engineRef.current = e })
-        return unsub
+        const unsubDictionary = window.api.onDictionaryChanged(setDictionary)
+        return () => {
+            unsub()
+            unsubDictionary()
+        }
     }, [])
 
     useEffect(() => {
@@ -93,6 +107,7 @@ export default function App() {
             setIsRecording(val)
             if (!val && wasCancelled) {
                 cancelledRef.current = true
+                recordingStartedAtRef.current = null
                 setElapsed(0)
             }
         })
@@ -102,8 +117,12 @@ export default function App() {
     // ── Timer ──
     useEffect(() => {
         if (!isRecording) return
+        recordingStartedAtRef.current = Date.now()
         setElapsed(0)
-        const id = setInterval(() => setElapsed((p) => p + 1), 1000)
+        const id = setInterval(() => {
+            const startedAt = recordingStartedAtRef.current
+            if (startedAt) setElapsed(Math.floor((Date.now() - startedAt) / 1000))
+        }, 250)
         return () => clearInterval(id)
     }, [isRecording])
 
@@ -129,6 +148,12 @@ export default function App() {
         let cancelled = false
 
         const start = async () => {
+            prepareMicrophoneForTranscription().catch((prepErr) => {
+                console.warn('Nao foi possivel preparar o microfone automaticamente:', prepErr)
+            })
+
+            if (cancelled) return
+
             const audioConstraints: MediaTrackConstraints = {
                 autoGainControl: false,
                 noiseSuppression: false,
@@ -144,7 +169,7 @@ export default function App() {
             try {
                 stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints })
             } catch (firstErr) {
-                // Selected mic unavailable — fall back to default
+                // Selected mic unavailable - fall back to default
                 if (micDeviceId) {
                     try {
                         stream = await navigator.mediaDevices.getUserMedia({
@@ -190,12 +215,16 @@ export default function App() {
 
             recorder.onstop = () => {
                 const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
+                const durationSeconds = recordingStartedAtRef.current
+                    ? Math.max(1, Math.round((Date.now() - recordingStartedAtRef.current) / 1000))
+                    : Math.max(1, elapsed)
+                recordingStartedAtRef.current = null
                 stream.getTracks().forEach((t) => t.stop())
                 streamRef.current = null
                 setActiveStream(null)
 
                 if (blob.size > 0 && !cancelledRef.current) {
-                    handleAudioReady(blob)
+                    handleAudioReady(blob, durationSeconds)
                 }
             }
 
@@ -245,7 +274,7 @@ export default function App() {
         window.api.requestCancelRecording()
     }, [])
 
-    const handleAudioReady = useCallback(async (blob: Blob) => {
+    const handleAudioReady = useCallback(async (blob: Blob, durationSeconds: number) => {
         if (blob.size < 1000) {
             await logError(`Gravação muito curta (${blob.size} bytes) — nenhum áudio capturado`)
             return
@@ -261,7 +290,8 @@ export default function App() {
         window.api.broadcastTranscribing(true)
 
         try {
-            const text = await transcribeWithNonEmptyRetry(blob, engineRef.current, 2)
+            const rawText = await transcribeWithNonEmptyRetry(blob, engineRef.current, 2)
+            const text = applyDictionary(rawText, dictionary)
 
             if (sessionRef.current !== sid) return
 
@@ -283,7 +313,7 @@ export default function App() {
             setTranscript(text)
             await window.api.copyToClipboard(text)
             await window.api.copyAndPaste(text)
-            await window.api.addHistory({ text, date: new Date().toISOString(), audioId })
+            await window.api.addHistory({ text, date: new Date().toISOString(), audioId, durationSeconds })
         } catch (err) {
             if (sessionRef.current !== sid) return
 
@@ -297,7 +327,7 @@ export default function App() {
             setElapsed(0)
             window.api.broadcastTranscribing(false)
         }
-    }, [])
+    }, [dictionary])
 
     if (isWidget) {
         return (
@@ -308,6 +338,7 @@ export default function App() {
                 onStop={stopRecording}
                 onCancel={cancelRecording}
                 shortcut={shortcut}
+                stopShortcut={stopShortcut}
             />
         )
     }
@@ -331,21 +362,28 @@ export default function App() {
                             elapsed={elapsed}
                             onToggle={toggleRecording}
                             onStop={stopRecording}
-                            onCancel={cancelRecording}
                             transcribing={transcribing}
                             shortcut={shortcut}
+                            stopShortcut={stopShortcut}
                             transcript={transcript}
                             activeStream={activeStream}
                         />
                     )}
                     {route === 'history' && <HistoryPage />}
+                    {route === 'dictionary' && <DictionaryPage />}
                     {route === 'transcription' && <TranscriptionPage />}
                     {route === 'shortcuts' && (
-                        <ShortcutsPage shortcut={shortcut} onShortcutChange={setShortcut} />
+                        <ShortcutsPage
+                            shortcut={shortcut}
+                            stopShortcut={stopShortcut}
+                            onShortcutChange={setShortcut}
+                            onStopShortcutChange={setStopShortcut}
+                        />
                     )}
                     {route === 'settings' && <SettingsPage />}
                 </div>
             </main>
+            <UpdateGate />
         </div>
     )
 }
