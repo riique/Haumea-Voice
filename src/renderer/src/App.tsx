@@ -148,12 +148,18 @@ export default function App() {
         let cancelled = false
 
         const start = async () => {
-            prepareMicrophoneForTranscription().catch((prepErr) => {
+            let preparedMicDeviceId = ''
+
+            try {
+                const preparedMic = await prepareMicrophoneForTranscription(micDeviceId)
+                preparedMicDeviceId = preparedMic.deviceId
+            } catch (prepErr) {
                 console.warn('Nao foi possivel preparar o microfone automaticamente:', prepErr)
-            })
+            }
 
             if (cancelled) return
 
+            const recordingDeviceId = micDeviceId || preparedMicDeviceId
             const audioConstraints: MediaTrackConstraints = {
                 autoGainControl: false,
                 noiseSuppression: false,
@@ -161,8 +167,8 @@ export default function App() {
                 channelCount: 1,
                 sampleRate: 48000
             }
-            if (micDeviceId) {
-                audioConstraints.deviceId = { exact: micDeviceId }
+            if (recordingDeviceId) {
+                audioConstraints.deviceId = { exact: recordingDeviceId }
             }
 
             let stream: MediaStream
@@ -170,7 +176,7 @@ export default function App() {
                 stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints })
             } catch (firstErr) {
                 // Selected mic unavailable - fall back to default
-                if (micDeviceId) {
+                if (recordingDeviceId) {
                     try {
                         stream = await navigator.mediaDevices.getUserMedia({
                             audio: {
