@@ -43,6 +43,34 @@ def friendly_name(device: Any) -> str:
     return str(value)
 
 
+def normalize_label(value: str) -> str:
+    return " ".join(value.strip().lower().split())
+
+
+def unique_labels(labels: list[str]) -> list[str]:
+    seen: set[str] = set()
+    unique: list[str] = []
+
+    for label in labels:
+        normalized = normalize_label(label)
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        unique.append(label.strip())
+
+    return unique
+
+
+def label_matches_device(label: str, device_name: str) -> bool:
+    normalized_label = normalize_label(label)
+    normalized_name = normalize_label(device_name)
+
+    if not normalized_label or not normalized_name:
+        return False
+
+    return normalized_label in normalized_name or normalized_name in normalized_label
+
+
 def wrap_device(AudioUtilities: Any, device: Any) -> Any:
     if device is None:
         return None
@@ -62,12 +90,12 @@ def find_preferred_device(AudioUtilities: Any, EDataFlow: Any, DEVICE_STATE: Any
         data_flow=EDataFlow.eCapture.value,
         device_state=DEVICE_STATE.ACTIVE.value,
     )
-    labels = [label.lower() for label in preferred_labels if label]
+    labels = unique_labels(preferred_labels)
 
-    for device in devices:
-        name = friendly_name(device).lower()
-        if any(label in name for label in labels):
-            return device
+    for label in labels:
+        for device in devices:
+            if label_matches_device(label, friendly_name(device)):
+                return device
 
     return None
 
@@ -79,6 +107,10 @@ def main() -> None:
 
     request = read_request()
     preferred_labels = list(PREFERRED_LABELS)
+    target_label = request.get("targetLabel")
+    if isinstance(target_label, str) and target_label.strip():
+        preferred_labels.insert(0, target_label.strip())
+
     for label in request.get("preferredLabels", []):
         if isinstance(label, str) and label.strip():
             preferred_labels.append(label.strip())

@@ -1,5 +1,6 @@
 export interface PrepareMicrophoneRequest {
     preferredLabels: string[]
+    targetLabel?: string
 }
 
 export interface PrepareMicrophoneResult {
