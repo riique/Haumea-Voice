@@ -3,7 +3,7 @@ productName: Haumea Voice
 publish:
   provider: github
   owner: riique
-  repo: Haumea-Voice
+  repo: HaumeaVoice-electron
 directories:
   buildResources: build
 files:

@@ -51,8 +51,8 @@ No Windows, o aplicativo também possui uma rotina opcional de preparação do m
 ## Instalação
 
 ```bash
-git clone https://github.com/riique/Haumea-Voice.git
-cd Haumea-Voice
+git clone https://github.com/riique/HaumeaVoice-electron.git
+cd HaumeaVoice-electron
 npm install
 ```
 
@@ -108,7 +108,7 @@ Os artefatos são gerados em `dist/`. O projeto configura NSIS no Windows, AppIm
 
 ## Atualizações
 
-O atualizador consulta as releases de `riique/Haumea-Voice`. Para publicar uma atualização:
+O atualizador consulta as releases de `riique/HaumeaVoice-electron`. Para publicar uma atualização:
 
 1. ajuste a versão em `package.json`;
 2. gere e teste os artefatos;
